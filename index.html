@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LANTANA BLD. フロアガイド</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&family=Space+Mono:wght@400;700&display=swap');
+  :root {
+    --bg: #f5f2ee; --panel: #ede9e3; --border: #a89880;
+    --accent: #0d2444; --text: #0d0d0d; --muted: #3a3028;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(245,242,238,0.97);
+    backdrop-filter: blur(10px);
+    z-index: 10;
+    flex-shrink: 0;
+  }
+  .logo { font-family: 'Space Mono', monospace; font-size: 16px; color: var(--accent); letter-spacing: 2px; }
+  .subtitle { font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+
+  /* ── Main layout: PC = 横並び、SP = 縦並び ── */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    flex-direction: row; /* PC */
+  }
+
+  /* ── 3D canvas ── */
+  #canvas-container {
+    flex: 1;
+    position: relative;
+    cursor: grab;
+    min-height: 0;
+  }
+  #canvas-container:active { cursor: grabbing; }
+  canvas { display: block; width: 100% !important; height: 100% !important; }
+
+  /* ── Hint ── */
+  .hint {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    background: rgba(245,242,238,0.9);
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    letter-spacing: 1px;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* ── Sidebar: PC = 右側縦スクロール ── */
+  .sidebar {
+    width: 300px;
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  .sidebar-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    flex-shrink: 0;
+  }
+
+  /* ── Floor cards ── */
+  .floor-card {
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.2s;
+    padding: 12px 16px;
+  }
+  .floor-card:hover { background: rgba(26,58,107,0.05); }
+  .floor-card.active { background: rgba(26,58,107,0.08); border-left: 3px solid var(--accent); }
+  .floor-num { font-family: 'Space Mono', monospace; font-size: 20px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+  .floor-name { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .floor-items { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .tag { font-size: 9px; padding: 2px 7px; border-radius: 10px; background: rgba(0,0,0,0.05); color: var(--muted); border: 1px solid var(--border); }
+  .floor-area { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--muted); margin-top: 5px; }
+  .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; }
+
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: var(--panel); }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* PC: floors-scroll は普通の縦並び */
+  .floors-scroll {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* ════════════════════════════
+     SP: 768px以下
+     3Dビュー上部 58dvh ＋ フロアカード下部 横スクロール
+  ════════════════════════════ */
+  @media (max-width: 768px) {
+    body { height: 100dvh; }
+
+    .main { flex-direction: column; }
+
+    #canvas-container {
+      height: 58dvh;
+      flex: none;
+    }
+
+    /* SP用ヒント */
+    .hint-pc { display: none; }
+    .hint-sp { display: block; }
+
+    .sidebar {
+      width: 100%;
+      height: auto;
+      flex: 1;
+      border-left: none;
+      border-top: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .sidebar-header { padding: 8px 16px; font-size: 9px; }
+
+    /* カードを横並び横スクロールに */
+    .floors-scroll {
+      flex-direction: row;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x mandatory;
+    }
+
+    .floor-card {
+      min-width: 185px;
+      max-width: 200px;
+      border-bottom: none;
+      border-right: 1px solid var(--border);
+      flex-shrink: 0;
+      scroll-snap-align: start;
+      padding: 10px 12px;
+    }
+    .floor-card.active {
+      border-left: none;
+      border-top: 3px solid var(--accent);
+      background: rgba(26,58,107,0.08);
+    }
+
+    .floors-scroll::-webkit-scrollbar { height: 3px; }
+    .floors-scroll::-webkit-scrollbar-track { background: var(--panel); }
+    .floors-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  }
+
+  /* ── タブレット ── */
+  @media (max-width: 1024px) and (min-width: 769px) {
+    .sidebar { width: 240px; }
+    .logo { font-size: 14px; }
+  }
+
+  /* PC用ヒント／SP用ヒント 初期状態 */
+  .hint-sp { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="logo">LANTANA BLD.</div>
+    <div class="subtitle">フロアガイド</div>
+  </div>
+</header>
+<div class="main">
+  <div id="canvas-container">
+    <canvas id="c"></canvas>
+    <div class="hint hint-pc">🖱 ドラッグで回転 ／ スクロールでズーム</div>
+    <div class="hint hint-sp">👆 ドラッグで回転 ／ ピンチでズーム</div>
+  </div>
+  <div class="sidebar">
+    <div class="sidebar-header">FLOOR INFORMATION</div>
+    <div class="floors-scroll">
+    <div class="floor-card active" data-floor="1" onclick="selectFloor(1)">
+      <div class="floor-num"><span class="color-dot" style="background:#8b1a10"></span>1F</div>
+      <div class="floor-name">LANTANA 食堂</div>
+      <div class="floor-items"><span class="tag">飲食店</span><span class="tag">テイクアウト</span><span class="tag">厨房</span><span class="tag">倉庫</span><span class="tag">WC</span></div>
+      <div class="floor-area">延床面積 約 99m²</div>
+    </div>
+    <div class="floor-card" data-floor="2" onclick="selectFloor(2)">
+      <div class="floor-num"><span class="color-dot" style="background:#7a3c00"></span>2F</div>
+      <div class="floor-name">LANTANA CAPSULE HOTEL</div>
+      <div class="floor-items"><span class="tag">客室 1〜6号室</span><span class="tag">受付</span><span class="tag">スタッフルーム</span><span class="tag">シャワー室</span><span class="tag">WC</span></div>
+      <div class="floor-area">33.98㎡（宿泊エリア）／ 12名</div>
+    </div>
+    <div class="floor-card" data-floor="3" onclick="selectFloor(3)">
+      <div class="floor-num"><span class="color-dot" style="background:#145a32"></span>3F</div>
+      <div class="floor-name">LANTANA CAPSULE HOTEL</div>
+      <div class="floor-items"><span class="tag">客室 1〜14号室</span><span class="tag">ランドリー</span><span class="tag">倉庫</span><span class="tag">MWC</span></div>
+      <div class="floor-area">57.35㎡（宿泊エリア）／ 28名</div>
+    </div>
+    <div class="floor-card" data-floor="4" onclick="selectFloor(4)">
+      <div class="floor-num"><span class="color-dot" style="background:#0d2e5a"></span>4F</div>
+      <div class="floor-name">LANTANA STUDY ROOM</div>
+      <div class="floor-items"><span class="tag">自習室 18名</span><span class="tag">休憩室</span><span class="tag">MWC</span></div>
+      <div class="floor-area">自習室 39.49㎡ ／ 休憩室 30.93㎡</div>
+    </div>
+    <div class="floor-card" data-floor="5" onclick="selectFloor(5)">
+      <div class="floor-num"><span class="color-dot" style="background:#4a1060"></span>5F</div>
+      <div class="floor-name">LANTANA RESIDENCE</div>
+      <div class="floor-items"><span class="tag">レンタルルーム 1</span><span class="tag">レンタルルーム 2</span></div>
+      <div class="floor-area">ルーム1 20.61㎡ ／ ルーム2 25.12㎡</div>
+    </div>
+    </div><!-- /.floors-scroll -->
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const container = document.getElementById('canvas-container');
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf5f2ee);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+
+const SCALE = 0.5;
+const W = 14.1 * SCALE;
+const D = 6.65 * SCALE;
+const FH = 3.5 * SCALE;
+const AW = 7.5 * SCALE;
+const AD = 2.2 * SCALE;
+
+const floorColors = {
+  1: 0x8b1a10, 2: 0x7a3c00, 3: 0x145a32, 4: 0x0d2e5a, 5: 0x4a1060
+};
+const floorColorsLight = {
+  1: 0xf5c8c0, 2: 0xf5dfc0, 3: 0xc8e8d5, 4: 0xc8d8f0, 5: 0xe0c8f5
+};
+
+let selectedFloor = 1;
+const floorGroups = {};
+const furnitureGroups = {};
+
+// ===== GEOMETRY HELPERS (all wireframe) =====
+
+function wBox(w, h, d, color, x, y, z, op=0.9) {
+  const m = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)),
+    new THREE.LineBasicMaterial({ color, transparent: true, opacity: op })
+  );
+  m.position.set(x, y, z);
+  return m;
+}
+
+function wCyl(rt, h, seg, color, x, y, z, op=0.9) {
+  const m = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.CylinderGeometry(rt, rt, h, seg)),
+    new THREE.LineBasicMaterial({ color, transparent: true, opacity: op })
+  );
+  m.position.set(x, y, z);
+  return m;
+}
+
+function wireBox(w, h, d, color, x, y, z, opacity=1) {
+  const g = new THREE.BoxGeometry(w, h, d);
+  const m = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity });
+  const mesh = new THREE.Mesh(g, m);
+  mesh.position.set(x, y, z);
+  return mesh;
+}
+
+// ===== PERSON (wireframe) =====
+function makePerson(color, x, y, z) {
+  const g = new THREE.Group();
+  const s = 0.18;
+  g.add(wBox(s, s*1.3, s*0.7, color, 0, s*0.7, 0));       // body
+  g.add(wBox(s*0.85, s*0.85, s*0.85, color, 0, s*1.6, 0)); // head
+  g.add(wBox(s*0.3, s*0.75, s*0.3, color, -s*0.2, 0, 0));  // leg L
+  g.add(wBox(s*0.3, s*0.75, s*0.3, color,  s*0.2, 0, 0));  // leg R
+  g.position.set(x, y, z);
+  return g;
+}
+
+// ===== FURNITURE BUILDERS (wireframe only) =====
+
+// Table
+function makeTable(color, x, y, z) {
+  const g = new THREE.Group();
+  g.add(wBox(0.7, 0.05, 0.45, color, 0, 0.35, 0));           // top
+  g.add(wBox(0.04, 0.34, 0.04, color, -0.3, 0.17, -0.18));   // leg
+  g.add(wBox(0.04, 0.34, 0.04, color,  0.3, 0.17, -0.18));
+  g.add(wBox(0.04, 0.34, 0.04, color, -0.3, 0.17,  0.18));
+  g.add(wBox(0.04, 0.34, 0.04, color,  0.3, 0.17,  0.18));
+  g.position.set(x, y, z);
+  return g;
+}
+
+// Chair
+function makeChair(color, x, y, z, rotY=0) {
+  const g = new THREE.Group();
+  g.add(wBox(0.35, 0.04, 0.35, color, 0, 0.22, 0));       // seat
+  g.add(wBox(0.35, 0.38, 0.04, color, 0, 0.42, -0.15));   // back
+  g.add(wBox(0.04, 0.22, 0.04, color, -0.14, 0.11, -0.14));
+  g.add(wBox(0.04, 0.22, 0.04, color,  0.14, 0.11, -0.14));
+  g.add(wBox(0.04, 0.22, 0.04, color, -0.14, 0.11,  0.14));
+  g.add(wBox(0.04, 0.22, 0.04, color,  0.14, 0.11,  0.14));
+  g.rotation.y = rotY;
+  g.position.set(x, y, z);
+  return g;
+}
+
+// Capsule bed
+function makeCapsuleBed(color, x, y, z) {
+  const g = new THREE.Group();
+  g.add(wBox(0.9, 0.5, 0.5, color, 0, 0.25, 0));          // shell
+  g.add(wBox(0.85, 0.05, 0.38, color, 0, 0.06, 0.02));    // mattress
+  g.add(wBox(0.22, 0.05, 0.3, color, -0.28, 0.12, 0.02)); // pillow
+  g.position.set(x, y, z);
+  return g;
+}
+
+// Counter
+function makeCounter(color, x, y, z) {
+  const g = new THREE.Group();
+  g.add(wBox(1.2, 0.8, 0.45, color, 0, 0.4, 0));
+  g.add(wBox(1.2, 0.04, 0.55, color, 0, 0.82, 0));
+  g.position.set(x, y, z);
+  return g;
+}
+
+// Desk
+function makeDesk(color, x, y, z) {
+  const g = new THREE.Group();
+  g.add(wBox(0.65, 0.04, 0.4, color, 0, 0.32, 0));
+  g.add(wBox(0.04, 0.32, 0.04, color, -0.3, 0.16, -0.18));
+  g.add(wBox(0.04, 0.32, 0.04, color,  0.3, 0.16, -0.18));
+  g.add(wBox(0.04, 0.32, 0.04, color, -0.3, 0.16,  0.18));
+  g.add(wBox(0.04, 0.32, 0.04, color,  0.3, 0.16,  0.18));
+  g.add(wBox(0.3, 0.2, 0.03, color, 0, 0.52, -0.16));     // monitor
+  g.add(wBox(0.05, 0.08, 0.05, color, 0, 0.36, -0.14));   // stand
+  g.position.set(x, y, z);
+  return g;
+}
+
+// Sofa
+function makeSofa(color, x, y, z) {
+  const g = new THREE.Group();
+  g.add(wBox(1.0, 0.18, 0.5, color,  0, 0.09, 0));
+  g.add(wBox(1.0, 0.28, 0.16, color, 0, 0.32, -0.17));
+  g.add(wBox(0.15, 0.26, 0.5, color, -0.42, 0.22, 0));
+  g.add(wBox(0.15, 0.26, 0.5, color,  0.42, 0.22, 0));
+  g.position.set(x, y, z);
+  return g;
+}
+
+// Washer
+function makeWasher(color, x, y, z) {
+  const g = new THREE.Group();
+  g.add(wBox(0.38, 0.42, 0.4, color, 0, 0.21, 0));
+  g.add(wCyl(0.11, 0.04, 12, color, 0, 0.33, 0.21));
+  g.position.set(x, y, z);
+  return g;
+}
+
+// Plant
+function makePlant(color, x, y, z) {
+  const g = new THREE.Group();
+  g.add(wCyl(0.12, 0.22, 6, color, 0, 0.11, 0));
+  g.add(wCyl(0.18, 0.28, 5, color, 0, 0.35, 0));
+  g.add(wCyl(0.12, 0.2,  5, color, 0.1, 0.42, 0.05));
+  g.position.set(x, y, z);
+  return g;
+}
+
+// Coffee machine
+function makeCoffeeMachine(color, x, y, z) {
+  const g = new THREE.Group();
+  g.add(wBox(0.3, 0.44, 0.28, color, 0, 0.22, 0));
+  g.add(wBox(0.18, 0.05, 0.18, color, 0, 0.46, 0));
+  g.add(wCyl(0.05, 0.12, 6, color, 0, 0.34, 0.15));
+  g.position.set(x, y, z);
+  return g;
+}
+
+// Bookshelf
+function makeBookshelf(color, x, y, z) {
+  const g = new THREE.Group();
+  g.add(wBox(0.76, 0.9, 0.32, color, 0, 0.45, 0));
+  g.add(wBox(0.74, 0.04, 0.3, color, 0, 0.0,  0));
+  g.add(wBox(0.74, 0.04, 0.3, color, 0, 0.3,  0));
+  g.add(wBox(0.74, 0.04, 0.3, color, 0, 0.6,  0));
+  g.position.set(x, y, z);
+  return g;
+}
+
+// Laptop
+function makeLaptop(color, x, y, z) {
+  const g = new THREE.Group();
+  g.add(wBox(0.34, 0.02, 0.24, color, 0, 0.01, 0));
+  const screen = wBox(0.32, 0.2, 0.02, color, 0, 0.12, -0.11);
+  screen.rotation.x = -0.3;
+  g.add(screen);
+  g.position.set(x, y, z);
+  return g;
+}
+
+// Bed (residence)
+function makeBed(color, x, y, z) {
+  const g = new THREE.Group();
+  g.add(wBox(0.9, 0.18, 1.8, color, 0, 0.09, 0));          // frame
+  g.add(wBox(0.86, 0.08, 1.7, color, 0, 0.22, 0));          // mattress
+  g.add(wBox(0.86, 0.08, 0.28, color, 0, 0.28, -0.72));     // pillow
+  g.add(wBox(0.9, 0.35, 0.06, color, 0, 0.27, 0.97));       // headboard
+  g.position.set(x, y, z);
+  return g;
+}
+
+// ===== BUILD FURNITURE PER FLOOR =====
+
+function buildFurniture1F(y) {
+  const g = new THREE.Group();
+  const c = floorColors[1];
+  const b = y + 0.01;
+  g.add(makeCounter(c, -1.2, b, -1.2));
+  g.add(makeCoffeeMachine(c, -1.8, b + 0.83, -1.4));
+  g.add(makePlant(c, 1.8, b, -1.4));
+  [[-0.5, 0.2], [0.9, 0.2], [-0.5, 1.1], [0.9, 1.1]].forEach(([tx, tz]) => {
+    g.add(makeTable(c, tx, b, tz));
+    g.add(makeChair(c, tx-0.5, b, tz, 0));
+    g.add(makeChair(c, tx+0.5, b, tz, Math.PI));
+    g.add(makeChair(c, tx, b, tz-0.38, Math.PI/2));
+  });
+  g.add(makePerson(c, -1.1, b, -0.9));
+  g.add(makePerson(c,  0.2, b,  0.5));
+  g.add(makePerson(c,  1.3, b,  0.8));
+  return g;
+}
+
+function buildFurniture2F(y) {
+  const g = new THREE.Group();
+  const c = floorColors[2];
+  const b = y + 0.01;
+  g.add(makeCounter(c, 1.8, b, -1.2));
+  g.add(makePerson(c, 1.6, b, -0.7));
+  for (let row = 0; row < 2; row++) {
+    for (let col = 0; col < 3; col++) {
+      g.add(makeCapsuleBed(c, -2.4 + col*0.95, b, -1.2 + row*0.65));
+    }
+  }
+  g.add(makeWasher(c, 2.0, b, 0.8));
+  g.add(makePlant(c, 2.5, b, -1.5));
+  return g;
+}
+
+function buildFurniture3F(y) {
+  const g = new THREE.Group();
+  const c = floorColors[3];
+  const b = y + 0.01;
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 4; col++) {
+      g.add(makeCapsuleBed(c, -2.8 + col*0.95, b, -1.3 + row*0.65));
+    }
+  }
+  g.add(makeWasher(c,  2.0, b, -1.0));
+  g.add(makeWasher(c,  2.5, b, -1.0));
+  g.add(makePlant(c, 2.8, b, 0.5));
+  g.add(makePerson(c, -1.5, b, 1.3));
+  g.add(makePerson(c,  0.3, b, 1.3));
+  return g;
+}
+
+function buildFurniture4F(y) {
+  const g = new THREE.Group();
+  const c = floorColors[4];
+  const b = y + 0.01;
+  g.add(makeBookshelf(c, -2.5, b, -1.4));
+  g.add(makeBookshelf(c, -1.3, b, -1.4));
+  [[-1.8,-0.4],[-0.6,-0.4],[0.6,-0.4],[1.8,-0.4],
+   [-1.8, 0.6],[-0.6, 0.6],[0.6, 0.6],[1.8, 0.6]].forEach(([dx,dz]) => {
+    g.add(makeDesk(c, dx, b, dz));
+    g.add(makeChair(c, dx, b, dz+0.4, Math.PI));
+    g.add(makeLaptop(c, dx, b+0.34, dz-0.04));
+  });
+  g.add(makePerson(c, -1.8, b, 0.7));
+  g.add(makePerson(c, -0.6, b, 0.7));
+  g.add(makePerson(c,  0.6, b, 0.7));
+  g.add(makeSofa(c, 2.5, b, 0.2));
+  g.add(makePlant(c, 3.0, b, -1.2));
+  return g;
+}
+
+function buildFurniture5F(y) {
+  const g = new THREE.Group();
+  const c = floorColors[5];
+  const b = y + 0.01;
+
+  // 間仕切り壁 (中央縦方向)
+  const wallH = FH * 0.85;
+  const wallW = 0.06;
+  // 縦壁（部屋を左右に分割）
+  g.add(wBox(wallW, wallH, D * 0.85, c, -0.35, b + wallH/2, -D*0.05));
+  // 横壁（廊下側の仕切り）
+  g.add(wBox(W * 0.28, wallH, wallW, c, -1.6, b + wallH/2, D*0.35));
+  g.add(wBox(W * 0.28, wallH, wallW, c,  0.95, b + wallH/2, D*0.35));
+
+  // Room 1 (left)
+  g.add(makeSofa(c, -2.2, b, 0.3));
+  g.add(makeDesk(c, -2.2, b, -0.8));
+  g.add(makeChair(c, -2.2, b, -0.4, Math.PI));
+  g.add(makePlant(c, -1.2, b, -1.3));
+  g.add(makeBed(c, -2.8, b, -0.1));
+
+  // Room 2 (right)
+  g.add(makeSofa(c, 0.8, b, 0.3));
+  g.add(makeDesk(c, 0.8, b, -0.8));
+  g.add(makeChair(c, 0.8, b, -0.4, Math.PI));
+  g.add(makePlant(c, 1.8, b, -1.3));
+  g.add(makeBed(c, 1.6, b, -0.1));
+
+  g.add(makePerson(c, -2.5, b, 0.8));
+  g.add(makePerson(c,  1.0, b, 0.8));
+  return g;
+}
+
+// ===== BUILD FLOORS =====
+
+for (let f = 1; f <= 5; f++) {
+  const group = new THREE.Group();
+  const y = (f - 1) * FH;
+  const col = floorColors[f];
+  const colLight = floorColorsLight[f];
+
+  // Wireframe box
+  group.add(wireBox(W, FH, D, col, 0, y + FH/2, 0, 0.45));
+
+  if (f <= 3) {
+    const annexX = W/2 + AW/2;
+    group.add(wireBox(AW, FH, AD, col, annexX, y + FH/2, D/2 - AD/2, 0.45));
+  }
+
+  // Floor slab (subtle tint)
+  const slabGeo = new THREE.PlaneGeometry(W, D);
+  const slabMat = new THREE.MeshBasicMaterial({ color: colLight, transparent: true, opacity: 0.18, side: THREE.DoubleSide });
+  const slab = new THREE.Mesh(slabGeo, slabMat);
+  slab.rotation.x = -Math.PI / 2;
+  slab.position.set(0, y + 0.01, 0);
+  group.add(slab);
+
+  // Sprite label
+  const lc = document.createElement('canvas');
+  lc.width = 256; lc.height = 128;
+  const ctx = lc.getContext('2d');
+  ctx.font = 'bold 48px monospace';
+  ctx.fillStyle = '#' + col.toString(16).padStart(6,'0');
+  ctx.fillText(f + 'F', 10, 56);
+  const names = ['LANTANA 食堂','CAPSULE HOTEL','CAPSULE HOTEL','STUDY ROOM','RESIDENCE'];
+  ctx.font = '22px sans-serif';
+  ctx.fillStyle = '#1a0f08';
+  ctx.fillText(names[f-1], 10, 90);
+  const spriteMat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(lc), transparent: true });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(8, 4, 1);
+  sprite.position.set(-W/2 - 4.5, y + FH/2, 0);
+  group.add(sprite);
+
+  floorGroups[f] = group;
+  scene.add(group);
+
+  // Furniture group
+  const furn = [null,
+    buildFurniture1F(y),
+    buildFurniture2F(y),
+    buildFurniture3F(y),
+    buildFurniture4F(y),
+    buildFurniture5F(y)
+  ][f];
+  furnitureGroups[f] = furn;
+  scene.add(furn);
+}
+
+// Grid
+const gridHelper = new THREE.GridHelper(60, 30, 0xa89880, 0xc8bfb0);
+scene.add(gridHelper);
+
+// ===== Resize =====
+function resize() {
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ===== Orbit =====
+let isDragging = false, prevX = 0, prevY = 0;
+let rotX = 0.3, rotY = 0.5, zoom = 55;
+const target = new THREE.Vector3(0, 4.375, 0);
+
+canvas.addEventListener('mousedown', e => { isDragging = true; prevX = e.clientX; prevY = e.clientY; });
+window.addEventListener('mouseup', () => isDragging = false);
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  rotY += (e.clientX - prevX) * 0.01;
+  rotX += (e.clientY - prevY) * 0.01;
+  rotX = Math.max(-1.2, Math.min(1.2, rotX));
+  prevX = e.clientX; prevY = e.clientY;
+});
+canvas.addEventListener('wheel', e => { zoom = Math.max(10, Math.min(120, zoom + e.deltaY * 0.05)); });
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    prevX = e.touches[0].clientX; prevY = e.touches[0].clientY;
+  }
+}, { passive: true });
+canvas.addEventListener('touchend', () => isDragging = false);
+canvas.addEventListener('touchmove', e => {
+  if (e.touches.length === 1 && isDragging) {
+    rotY += (e.touches[0].clientX - prevX) * 0.01;
+    rotX += (e.touches[0].clientY - prevY) * 0.01;
+    rotX = Math.max(-1.2, Math.min(1.2, rotX));
+    prevX = e.touches[0].clientX; prevY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    // ピンチズーム
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (canvas._pinchDist) {
+      zoom = Math.max(10, Math.min(120, zoom - (dist - canvas._pinchDist) * 0.15));
+    }
+    canvas._pinchDist = dist;
+  }
+}, { passive: true });
+canvas.addEventListener('touchend', () => { canvas._pinchDist = null; isDragging = false; });
+
+// ===== Select floor =====
+window.selectFloor = function(f) {
+  selectedFloor = f;
+  document.querySelectorAll('.floor-card').forEach(el => el.classList.remove('active'));
+  document.querySelector(`[data-floor="${f}"]`).classList.add('active');
+  updateVisibility();
+};
+
+function updateVisibility() {
+  for (let f = 1; f <= 5; f++) {
+    const isActive = f === selectedFloor;
+    // Wireframe opacity
+    floorGroups[f].children.forEach(child => {
+      if (!child.material) return;
+      if (child.material.wireframe) {
+        child.material.opacity = isActive ? 1 : 0.3;
+      } else if (child.material.transparent) {
+        child.material.opacity = isActive ? 0.3 : 0.08;
+      }
+    });
+    // Furniture visibility
+    furnitureGroups[f].visible = isActive;
+  }
+}
+
+// ===== Animate =====
+let time = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  time += 0.01;
+  if (!isDragging) rotY += 0.003;
+  camera.position.x = target.x + zoom * Math.sin(rotY) * Math.cos(rotX);
+  camera.position.y = target.y + zoom * Math.sin(rotX);
+  camera.position.z = target.z + zoom * Math.cos(rotY) * Math.cos(rotX);
+  camera.lookAt(target);
+
+  // Pulse active floor wireframe
+  floorGroups[selectedFloor].children.forEach(child => {
+    if (child.material && child.material.wireframe)
+      child.material.opacity = 0.6 + 0.4 * Math.sin(time * 2);
+  });
+
+  renderer.render(scene, camera);
+}
+
+updateVisibility();
+animate();
+</script>
+</body>
+</html>
